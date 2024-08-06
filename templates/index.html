@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Duplicate File Finder</title>
+    <style>
+        /* ... (existing styles remain unchanged) ... */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Duplicate File Finder</h1>
+    <form id="scan-form"> <label for="directory">Directory:</label> <input type="text" id="directory" name="directory"
+            required> <input type="checkbox" id="use_cache" name="use_cache" checked> <label for="use_cache">Use
+            Cache</label> <button type="submit">Scan</button> </form>
+    <div id="results"></div> <!-- Add the delete button here, initially disabled --> <button id="delete-button"
+        >Delete Selected Files</button>
+
+    <script>
+        document.getElementById('scan-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const directory = document.getElementById('directory').value;
+            const use_cache = document.getElementById('use_cache').checked;
+            fetch('/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ directory, use_cache })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const resultsDiv = document.getElementById('results');
+                    resultsDiv.innerHTML = '';
+                    if (data.error) {
+                        resultsDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+                        return;
+                    }
+                    Object.keys(data.similar_files).forEach(group => {
+                        const groupDiv = document.createElement('div');
+                    groupDiv.innerHTML = `<h3>Group ${group}</h3>`;
+                    const table = document.createElement('table');
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = `
+                        <tr>
+                            <th>Select</th>
+                            <th>Name</th>
+                            <th>Path</th>
+                            <th>Type</th>
+                            <th>Size (bytes)</th>
+                            <th>Artist</th>
+                            <th>Album</th>
+                            <th>Title</th>
+                            <th>Duration (seconds)</th>
+                        </tr>
+                    `;
+                    table.appendChild(thead);
+                    const tbody = document.createElement('tbody');
+                    data.similar_files[group].forEach(idx => {
+                        const file = data.files[idx];
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><input type="checkbox" name="files" value="${file.path}"></td>
+                            <td>${file.name}</td>
+                            <td>${file.path}</td>
+                            <td>${file.type}</td>
+                            <td>${file.size}</td>
+                            <td>${file.artist}</td>
+                            <td>${file.album}</td>
+                            <td>${file.title}</td>
+                            <td>${file.duration}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                    table.appendChild(tbody);
+                    groupDiv.appendChild(table);
+                    resultsDiv.appendChild(groupDiv);
+
+                    });
+
+                    // Add event listeners to checkboxes
+                    document.querySelectorAll('input[name="files"]').forEach(checkbox => {
+                        checkbox.addEventListener('change', updateDeleteButton);
+                    });
+
+                    // Initial update of delete button state
+                    updateDeleteButton();
+                });
+        });
+
+        // Function to update delete button state
+        function updateDeleteButton() {
+            const deleteButton = document.getElementById('delete-button');
+            const selectedFiles = document.querySelectorAll('input[name="files"]:checked');
+        }
+
+        // Event listener for delete button
+        document.getElementById('delete-button').addEventListener('click', function () {
+            const selectedFiles = Array.from(document.querySelectorAll('input[name="files"]:checked')).map(input => input.value);
+            fetch('/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files: selectedFiles })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert('Files deleted successfully');
+                    // After deletion, update the button state
+                    updateDeleteButton();
+                });
+        });
+    </script>
+</body>
+
+</html>
